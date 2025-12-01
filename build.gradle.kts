@@ -1,15 +1,77 @@
+import kotlinx.benchmark.gradle.BenchmarkConfiguration
+
 plugins {
-    kotlin("jvm") version "2.2.21"
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.allopen)
+    alias(libs.plugins.kotlinx.benchmark)
+    alias(libs.plugins.aoc.inputs.downloader)
+    alias(libs.plugins.ktlint)
 }
 
-sourceSets {
-    main {
-        kotlin.srcDir("src")
+repositories {
+    mavenCentral()
+}
+
+allOpen {
+    annotation("org.openjdk.jmh.annotations.State")
+}
+
+val benchmarksSourceSet = sourceSets.create("benchmarks")
+
+kotlin {
+    jvmToolchain(21)
+    target {
+        compilations["benchmarks"].associateWith(compilations["main"])
     }
 }
 
-tasks {
-    wrapper {
-        gradleVersion = "9.2.1"
+val benchmarksDirectorySubPath = File.separator + benchmarksSourceSet.name + File.separator
+
+ktlint {
+    filter {
+        exclude { benchmarksDirectorySubPath in it.file.absolutePath }
+    }
+}
+
+val benchmarksImplementation by configurations
+
+dependencies {
+    benchmarksImplementation(libs.kotlinx.benchmark.runtime)
+}
+
+downloadAocInputs {
+    sessionCookie { projectDir.resolve("secrets/session-cookie.txt").readText() }
+}
+
+benchmark {
+    targets.register("benchmarks")
+    configurations {
+        benchmarksSourceSet.kotlin.asSequence()
+            .filter { it.extension == "kt" }
+            .forEach { file -> registerBenchmarkTasks(file.nameWithoutExtension) }
+    }
+}
+
+fun NamedDomainObjectContainerScope<BenchmarkConfiguration>.registerBenchmarkTasks(fileName: String) {
+    val trimmedName = fileName.replaceFirstChar { it.lowercaseChar() }.substringBefore("Benchmark")
+    val includePattern = ".*$fileName.*"
+
+    register("${trimmedName}Standard") {
+        include(includePattern)
+        warmups = 5
+        iterations = 5
+        iterationTime = 5
+        iterationTimeUnit = "sec"
+        mode = "avgt"
+        outputTimeUnit = "ms"
+    }
+    register("${trimmedName}Fast") {
+        include(includePattern)
+        warmups = 20
+        iterations = 5
+        iterationTime = 500
+        iterationTimeUnit = "ms"
+        mode = "avgt"
+        outputTimeUnit = "ms"
     }
 }

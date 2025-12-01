@@ -3,4 +3,6 @@
 .kotlin/
 build
 src/**/*.txt
-local.properties
+secrets
+src/benchmarks
+out

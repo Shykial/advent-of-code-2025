@@ -4,6 +4,8 @@ import java.io.BufferedReader
 
 private val classLoader = object {}::class.java.classLoader
 
+fun readInput(name: String): String = withResourceReader("inputs/$name.txt") { it.readText().trimEnd() }
+
 fun readInputLines(name: String): List<String> = withResourceReader("inputs/$name.txt") { it.readLines() }
 
 private inline fun <T> withResourceReader(path: String, block: (BufferedReader) -> T) =

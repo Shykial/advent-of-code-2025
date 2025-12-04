@@ -22,27 +22,6 @@ object Day04 {
         }.takeWhile { deletedCount -> deletedCount > 0 }.sum()
     }
 
-    // for whatever reason that's slower than the functional version,
-    // decompiled bytecode looks like a mess given it's just simple loops...
-    fun part2Imperative(input: List<String>): Int {
-        val mutableInput = input.map { it.toCharArray() }
-
-        var deletions = 0
-        do {
-            var localDeletions = 0
-            mutableInput.forEachIndexed { y, row ->
-                row.forEachIndexed { x, c ->
-                    if (c == '@' && Coordinates(y, x).isAccessibleByForklift(mutableInput::getOrNull)) {
-                        localDeletions++
-                        mutableInput[y][x] = '.'
-                    }
-                }
-            }
-            deletions += localDeletions
-        } while (localDeletions > 0)
-        return deletions
-    }
-
     private inline fun Coordinates.isAccessibleByForklift(charSupplier: (Coordinates) -> Char?) =
         (y - 1..y + 1).sumOf { y ->
             (x - 1..x + 1).count { x -> charSupplier(Coordinates(y, x)) == '@' }

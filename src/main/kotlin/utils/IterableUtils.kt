@@ -17,3 +17,14 @@ inline fun <T> Iterable<T>.splitBy(delimiterPredicate: (T) -> Boolean): List<Lis
     }
     currentAggregate?.let { this += it }
 }
+
+inline fun <T> Iterable<T>.filter(limit: Int, predicate: (T) -> Boolean): List<T> = buildList(limit) {
+    this@filter.forEach {
+        if (predicate(it)) {
+            add(it)
+            if (size == limit) return@buildList
+        }
+    }
+}
+
+fun Sequence<*>.process(): Unit = forEach { _ -> }

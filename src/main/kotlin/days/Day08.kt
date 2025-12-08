@@ -4,7 +4,6 @@ import utils.filter
 import utils.process
 import utils.readInputLines
 import java.util.PriorityQueue
-import kotlin.math.abs
 import kotlin.math.sqrt
 
 object Day08 {
@@ -51,7 +50,7 @@ object Day08 {
             .let { (x, y, z) -> Coordinates3D(x, y, z) }
 
     private fun Coordinates3D.distanceFrom(other: Coordinates3D): Double =
-        sqrt((abs(x - other.x).squared() + abs(y - other.y).squared() + abs(z - other.z).squared()).toDouble())
+        sqrt(((x - other.x).squared() + (y - other.y).squared() + (z - other.z).squared()).toDouble())
 
     private fun List<Coordinates3D>.pairsByDistanceQueue(): PriorityQueue<Pair<Coordinates3D, Coordinates3D>> =
         asSequence().flatMapIndexedTo(PriorityQueue(compareBy { it.first.distanceFrom(it.second) })) { idx, a ->

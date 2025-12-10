@@ -5,6 +5,8 @@ import utils.readInputLines
 import java.util.LinkedList
 import java.util.PriorityQueue
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 
 object Day09 {
     fun part1(input: List<String>): Long {
@@ -28,11 +30,42 @@ object Day09 {
 
     data class Rectangle(
         val topLeft: Coordinates,
-        val topRight: Coordinates,
-        val bottomLeft: Coordinates,
+//        val topRight: Coordinates,
+//        val bottomLeft: Coordinates,
         val bottomRight: Coordinates
     )
 
+    fun Rectangle.isCutBy(coordsPair: Pair<Coordinates, Coordinates>): Boolean {
+        val (first, second) = coordsPair
+        val smallerXRange = topLeft.x + 1..<bottomRight.x
+        val smallerYRange = topLeft.y + 1..<bottomRight.y
+//        val (minX, maxX) = coordsPair.toList().sortedBy { it.x }
+//        val (minY, maxY) = coordsPair.toList().sortedBy { it.y }
+        return if (first.x == second.x) {
+            first.x in (topLeft.x + 1)..<bottomRight.x && run {
+                val (minY, maxY) = coordsPair.toList().map { it.y }.sorted()
+//                val affectedRange = minY..maxY
+                topLeft.y + 1 in minY..maxY || bottomRight.y - 1 in minY..maxY
+//                (affectedRange.first >= smallerYRange.first && affectedRange.last >= smallerYRange.first) ||
+//                    (affectedRange.first >= smallerYRange.last && affectedRange.last >= smallerYRange.last) ||
+            }
+        } else if (first.y == second.y) {
+            first.y in (topLeft.y + 1)..<bottomRight.y && run {
+                val (minX, maxX) = coordsPair.toList().map { it.x }.sorted()
+//                val affectedRange = minY..maxY
+                topLeft.x + 1 in minX..maxX || bottomRight.x - 1 in minX..maxX
+//                (affectedRange.first >= smallerYRange.first && affectedRange.last >= smallerYRange.first) ||
+//                    (affectedRange.first >= smallerYRange.last && affectedRange.last >= smallerYRange.last) ||
+            }
+        } else error("should not happend")
+    }
+
+//    private fun IntRange.intersect(other: IntRange) =
+//
+//        operator
+
+    fun Rectangle.contains(coordinates: Coordinates) =
+        coordinates.x in topLeft.x + 1..<bottomRight.x && coordinates.y in topLeft.y + 1..<bottomRight.y
 //    fun Rectangle.intersection(other: Rectangle) = Rectangle(
 //        topLeft =
 //    )
@@ -57,13 +90,48 @@ object Day09 {
 
         return generateSequence { pairsQueue.poll() }
             .first { (a, b) ->
-                val (min, max) = listOf(a, b).sortedWith(compareBy({ it.y }, { it.x }))
-//                val slice1 = vectors.cyclingSequence()
+                val rectangle = Rectangle(
+                    topLeft = Coordinates(min(a.y, b.y), min(a.x, b.x)),
+                    bottomRight = Coordinates(max(a.y, b.y), max(a.x, b.x))
+                )
+//                val z = coordsInOrder.none { it in rectangle }
+
+                //                val slice1 = vectors.cyclingSequence()
 //                    .sliceByElements(start = { it.first == a }, end = { it.second == b })
 //                val slice2 = vectors.cyclingSequence()
 //                    .sliceByElements(start = { it.first == b }, end = { it.second == a })
 //                val minSlice = listOf(slice1, slice2).minBy { it.size }
-                false
+//                fun List<Pair<Coordinates, Coordinates>>.toGridString2(
+//                    width: Int,
+//                    height: Int,
+//                    first: Coordinates,
+//                    second: Coordinates
+//                ): String {
+//                    val list = List(height + 1) { y ->
+//                        CharArray(width + 1) { '.' }
+//                    }
+//                    this.forEach { (a, b) ->
+//                        if (a.y == b.y) {
+//                            val (min, max) = listOf(a.x, b.x).sorted()
+//                            (min..max).forEach { x ->
+//                                list[a.y][x] = 'X'
+//                            }
+//                        } else {
+//                            val (min, max) = listOf(a.y, b.y).sorted()
+//                            (min..max).forEach { y ->
+//                                list[y][a.x] = 'X'
+//                            }
+//                        }
+//                    }
+//                    list[first.y][first.x] = 'O'
+//                    list[second.y][second.x] = 'O'
+//                    return list.joinToString("\n") { it.concatToString() }
+//                }
+//
+//                val str = vectors.toGridString2(width = grid.maxOf { it.x }, height = grid.maxOf { it.y }, a, b)
+                val z = vectors.none { rectangle.isCutBy(it) }
+
+                z
             }.let { it.areaOfRectangle() }
     }
 
@@ -154,6 +222,6 @@ fun main() {
     val input = readInputLines("Day09")
     println("part1: ${Day09.part1(testInput)}")
     println("part1: ${Day09.part1(input)}")
+    println("part2: ${Day09.part2(input)}") // TODO fix on testInput
     println("part2: ${Day09.part2(testInput)}")
-    println("part2: ${Day09.part2(input)}")
 }

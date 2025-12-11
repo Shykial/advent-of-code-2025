@@ -27,4 +27,6 @@ inline fun <T> Iterable<T>.filter(limit: Int, predicate: (T) -> Boolean): List<T
     }
 }
 
+fun Iterable<Long>.product() = fold(1L, Long::times)
+
 fun Sequence<*>.process(): Unit = forEach { _ -> }

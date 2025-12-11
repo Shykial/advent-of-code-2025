@@ -32,7 +32,7 @@ object Day09 {
         val topLeft: Coordinates,
 //        val topRight: Coordinates,
 //        val bottomLeft: Coordinates,
-        val bottomRight: Coordinates
+        val bottomRight: Coordinates,
     )
 
     fun Rectangle.isCutBy(coordsPair: Pair<Coordinates, Coordinates>): Boolean {
@@ -42,21 +42,23 @@ object Day09 {
 //        val (minX, maxX) = coordsPair.toList().sortedBy { it.x }
 //        val (minY, maxY) = coordsPair.toList().sortedBy { it.y }
         return if (first.x == second.x) {
-            first.x in (topLeft.x + 1)..<bottomRight.x && run {
-                val (minY, maxY) = coordsPair.toList().map { it.y }.sorted()
+            first.x in (topLeft.x + 1)..<bottomRight.x &&
+                run {
+                    val (minY, maxY) = coordsPair.toList().map { it.y }.sorted()
 //                val affectedRange = minY..maxY
-                topLeft.y + 1 in minY..maxY || bottomRight.y - 1 in minY..maxY
+                    topLeft.y + 1 in minY..maxY || bottomRight.y - 1 in minY..maxY
 //                (affectedRange.first >= smallerYRange.first && affectedRange.last >= smallerYRange.first) ||
 //                    (affectedRange.first >= smallerYRange.last && affectedRange.last >= smallerYRange.last) ||
-            }
+                }
         } else if (first.y == second.y) {
-            first.y in (topLeft.y + 1)..<bottomRight.y && run {
-                val (minX, maxX) = coordsPair.toList().map { it.x }.sorted()
+            first.y in (topLeft.y + 1)..<bottomRight.y &&
+                run {
+                    val (minX, maxX) = coordsPair.toList().map { it.x }.sorted()
 //                val affectedRange = minY..maxY
-                topLeft.x + 1 in minX..maxX || bottomRight.x - 1 in minX..maxX
+                    topLeft.x + 1 in minX..maxX || bottomRight.x - 1 in minX..maxX
 //                (affectedRange.first >= smallerYRange.first && affectedRange.last >= smallerYRange.first) ||
 //                    (affectedRange.first >= smallerYRange.last && affectedRange.last >= smallerYRange.last) ||
-            }
+                }
         } else error("should not happend")
     }
 
@@ -92,7 +94,7 @@ object Day09 {
             .first { (a, b) ->
                 val rectangle = Rectangle(
                     topLeft = Coordinates(min(a.y, b.y), min(a.x, b.x)),
-                    bottomRight = Coordinates(max(a.y, b.y), max(a.x, b.x))
+                    bottomRight = Coordinates(max(a.y, b.y), max(a.x, b.x)),
                 )
 //                val z = coordsInOrder.none { it in rectangle }
 
@@ -168,7 +170,6 @@ object Day09 {
     }
 
     private fun <T> List<T>.cyclingSequence() = generateSequence(0) { (it + 1) % size }.map { this[it] }
-
 
     private fun parseLine(line: String) =
         line

@@ -1,8 +1,15 @@
 package days
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import utils.onFalse
 import utils.readInputLines
 import java.util.PriorityQueue
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.TimeSource
+
+private typealias Button = List<Int>
 
 object Day10 {
     fun part1(input: List<String>): Long {
@@ -27,33 +34,187 @@ object Day10 {
         return machines.sumOf { machine ->
             val initial = MachineStateNode2(
                 joltageDelta = machine.joltageRequirements,
-                moves = 0
+                moves = 0,
             )
             val seenStates = mutableSetOf(initial.joltageDelta)
             val queue = PriorityQueue<MachineStateNode2>(compareBy({ it.distanceFromExpected }, { it.moves }))
             generateSequence(initial) { queue.poll() }
                 .first { node ->
                     (node.distanceFromExpected == 0).onFalse {
-                        queue += node.nextStates(machine.buttons).filter { seenStates.add(it.joltageDelta) }
+                        queue += node.nextStates(machine.buttons)
+                            .filter { seenStates.add(it.joltageDelta) }
                     }
                 }.moves
-                .also { println("Processed single machine") }
+                .also { println("Processed single machine, result: $it") }
         }
+    }
+
+    fun part2Parallel(input: List<String>): Long = runBlocking(Dispatchers.Default) {
+        val machines = input.map { parseMachine(it) }
+
+        machines.mapIndexed { index, machine ->
+            async {
+                val initial = MachineStateNode2(
+                    joltageDelta = machine.joltageRequirements,
+                    moves = 0,
+                )
+                val seenStates = mutableSetOf(initial.joltageDelta)
+                val queue = PriorityQueue<MachineStateNode2>(compareBy({ it.distanceFromExpected }, { it.moves }))
+                generateSequence(initial) { queue.poll() }
+                    .first { node ->
+                        (node.distanceFromExpected == 0).onFalse {
+                            queue += node.nextStates(machine.buttons)
+                                .filter { seenStates.add(it.joltageDelta) }
+                        }
+                    }.moves
+                    .also { println("Processed single machine for index: $index, result: $it") }
+            }
+        }.sumOf { it.await() }
+    }
+
+    fun part2X(input: List<String>): Long = runBlocking(Dispatchers.Default) {
+        val machines = input.map { parseMachine(it) }
+        val count = AtomicInteger()
+        val timeMark = TimeSource.Monotonic.markNow()
+        machines.mapIndexed { index, machine ->
+            async {
+                val localTimeMark = TimeSource.Monotonic.markNow()
+                val buttons = machine.buttons
+                val buttonsForIndexes = List(machine.joltageRequirements.size) { idx ->
+                    buttons.filter { idx in it }
+                }
+                val initial = MachineStateNodeX(
+                    joltageDelta = machine.joltageRequirements,
+                    availableButtons = buttons,
+                    moves = 0,
+                )
+
+                val seenStates = mutableSetOf(initial.joltageDelta)
+                val queue = PriorityQueue<MachineStateNodeX>(
+                    compareBy<MachineStateNodeX>(
+                        { it.distanceFromExpected },
+                        { -it.availableButtons.size },
+                        { it.moves },
+                    ),
+                )
+                generateSequence(initial) { queue.poll() }
+                    .first { node ->
+                        (node.distanceFromExpected == 0).onFalse {
+                            queue += node.availableButtons.asSequence()
+                                .mapNotNull { button ->
+                                    var buttonsToRemove: MutableList<List<Int>>? = null
+                                    val newDelta = node.joltageDelta.toMutableList().apply {
+                                        button.forEach { idx ->
+                                            val newJoltage = --this[idx]
+                                            if (newJoltage < 0) return@mapNotNull null
+                                            else if (newJoltage == 0) {
+                                                if (buttonsToRemove == null) buttonsToRemove = mutableListOf()
+                                                buttonsToRemove!! += buttonsForIndexes[idx]
+                                            }
+                                        }
+                                    }
+                                    MachineStateNodeX(
+                                        joltageDelta = newDelta,
+                                        availableButtons = if (buttonsToRemove == null) node.availableButtons else node.availableButtons - buttonsToRemove,
+                                        moves = node.moves + 1,
+                                    )
+                                }
+                                .filter { seenStates.add(it.joltageDelta) }
+                        }
+                    }.moves
+                    .also {
+                        println("Processed single machine for line: $index, result: $it, ${count.incrementAndGet()} / ${machines.size}, elapsed for machine: ${localTimeMark.elapsedNow()}, in total: ${timeMark.elapsedNow()}")
+                    }
+            }
+        }.sumOf { it.await() }
+    }
+
+    fun part2_2(input: List<String>): Int {
+        val machines = input.map { parseMachine(it) }
+
+        return machines.sumOf { machine ->
+            val sortedRequirements = machine.joltageRequirements.withIndex().sortedBy { it.value }
+            val buttonsForIndexes = List(machine.joltageRequirements.size) { idx ->
+                machine.buttons.filter { idx in it }
+            }
+            val buttonsMap = mutableMapOf<List<Int>, Int>()
+
+            sortedRequirements.forEach { (index, value) ->
+                val applicableButtons = buttonsForIndexes[index]
+                applicableButtons.forEach {
+                    buttonsMap.merge(it, value) { _, old -> minOf(old, value) }
+                }
+            }
+            buttonsMap.values.sum().also { println("Machine result: $it") }
+        }
+    }
+
+    fun part2_2Recursive(input: List<String>): Long = runBlocking(Dispatchers.Default) {
+        val machines = input.map { parseMachine(it) }
+
+        machines.mapIndexed { index, machine ->
+            async {
+                val sortedRequirements = machine.joltageRequirements.withIndex().sortedBy { it.value }
+                val buttonsAsArrays = machine.buttons.map { it.toIntArray() }
+                val buttonsForIndexes = List(machine.joltageRequirements.size) { idx ->
+                    buttonsAsArrays.filter { idx in it }
+                }
+//            val buttonsMap = mutableMapOf<List<Int>, Int>()
+
+                //            sortedRequirements.forEach { (index, value) ->
+//                val applicableButtons = buttonsForIndexes[index]
+//                applicableButtons.forEach {
+//                    buttonsMap.merge(it, value) { _, old -> minOf(old, value) }
+//                }
+//            }
+                val sortedButtons = buttonsAsArrays.sortedByDescending { it.size }
+                val cache = mutableMapOf<List<Int>, Long>()
+
+                fun trySolve(currentDelta: IntArray, availableButtons: List<IntArray>, depth: Long): Long {
+                    return cache.getOrPut(currentDelta.asList()) {
+                        if (currentDelta.all { it == 0 }) return@getOrPut depth
+                        if (availableButtons.isEmpty()) return@getOrPut -1
+                        return availableButtons
+                            .firstNotNullOfOrNull { button ->
+                                var buttonsToRemove: MutableList<IntArray>? = null
+                                val newDelta = currentDelta.copyOf().apply {
+                                    button.forEach { idx ->
+                                        val newValue = --this[idx]
+                                        if (newValue == 0) {
+                                            if (buttonsToRemove == null) buttonsToRemove = mutableListOf()
+                                            buttonsToRemove!! += buttonsForIndexes[idx]
+                                        }
+                                    }
+                                }
+                                val newButtons =
+                                    if (buttonsToRemove != null) availableButtons - buttonsToRemove else availableButtons
+                                trySolve(newDelta, newButtons, depth + 1L)
+                                    .takeIf { it != -1L }
+                            } ?: -1
+                    }
+                }
+
+                trySolve(machine.joltageRequirements.toIntArray(), sortedButtons, 0)
+                    .also { println("part2_2Recursive Machine result for line: $index: $it") }
+            }
+//            buttonsMap.values.sum().also { println("Machine result: $it") }
+        }.sumOf { it.await() }
     }
 
     fun part2Hybrid(input: List<String>): Long {
         val machines = input.map { parseMachine(it) }
         return machines.sumOf { machine ->
             val neededMovesMap = mutableMapOf<List<Int>, Long>()
+            val seenStates = mutableSetOf<List<Int>>()
 
             fun tryProcessSequence(sequence: List<Int>): Long = neededMovesMap.getOrPut(sequence) {
-                val seenStates = mutableSetOf(sequence)
                 val node = MachineStateNode3(sequence, machine.joltageRequirements, 0, 0)
 
                 val queue = PriorityQueue<MachineStateNode3>(
                     compareBy(
                         { it.distanceFromExpected },
-                        { it.moves })
+                        { it.moves },
+                    ),
                 )
                 val result = generateSequence(node) { queue.poll() }
                     .firstOrNull { node ->
@@ -68,10 +229,14 @@ object Day10 {
                                 MachineStateNode3(
                                     joltageSequence = newJoltageSequence,
                                     expectedJoltageSequence = node.expectedJoltageSequence,
-                                    neededMoves = tryProcessSequence(newJoltageSequence),
-                                    moves = node.moves + 1
+                                    neededMoves = neededMovesMap.getOrPut(newJoltageSequence) {
+                                        tryProcessSequence(
+                                            newJoltageSequence,
+                                        )
+                                    },
+                                    moves = node.moves + 1,
                                 )
-                            }.filter { seenStates.add(it.joltageSequence) }
+                            }.distinctBy { it.neededMoves }
                         }
                     }?.let { it.moves + it.neededMoves } ?: Long.MAX_VALUE
                 result
@@ -136,14 +301,22 @@ object Day10 {
 
     private data class MachineStateNode(
         val lightSequence: List<Boolean>,
-        val moves: Int
+        val moves: Int,
     ) {
         val distanceFromExpected by lazy { lightSequence.count { it } }
     }
 
     private data class MachineStateNode2(
         val joltageDelta: List<Int>,
-        val moves: Long
+        val moves: Long,
+    ) {
+        val distanceFromExpected by lazy(mode = LazyThreadSafetyMode.NONE) { joltageDelta.sum() }
+    }
+
+    private data class MachineStateNodeX(
+        val joltageDelta: List<Int>,
+        val moves: Long,
+        val availableButtons: List<List<Int>>,
     ) {
         val distanceFromExpected by lazy(mode = LazyThreadSafetyMode.NONE) { joltageDelta.sum() }
     }
@@ -152,7 +325,7 @@ object Day10 {
         val joltageSequence: List<Int>,
         val expectedJoltageSequence: List<Int>,
         val moves: Long,
-        val neededMoves: Long
+        val neededMoves: Long,
     ) {
         val distanceFromExpected by lazy(mode = LazyThreadSafetyMode.NONE) {
             joltageSequence.zip(expectedJoltageSequence) { a, b -> b - a }.sum()
@@ -178,7 +351,7 @@ object Day10 {
                 }
                 MachineStateNode2(
                     joltageDelta = newDelta,
-                    moves = moves + 1
+                    moves = moves + 1,
                 )
             }
 
@@ -195,7 +368,7 @@ object Day10 {
     data class Machine(
         val lightSequence: List<Boolean>,
         val buttons: List<List<Int>>,
-        val joltageRequirements: List<Int>
+        val joltageRequirements: List<Int>,
     )
 }
 
@@ -211,8 +384,19 @@ fun main() {
     println("part1: ${Day10.part1(testInput)}")
     println("part1: ${Day10.part1(input)}") // 594 too high????
     println("part2: ${Day10.part2(testInput)}")
-    println("part2: ${Day10.part2Recursive2(testInput)}")
-    println("part2: ${Day10.part2Recursive2(input)}")
+    println("part2: ${Day10.part2(testInput)}")
+    println("part2: ${Day10.part2_2(testInput)}")
+    println("part2: ${Day10.part2_2Recursive(testInput)}")
+    println("part2: ${Day10.part2X(testInput)}")
+    println("part2: ${Day10.part2Parallel(testInput)}")
+//    println("part2: ${Day10.part2Parallel(input)}")
+    println("part2: ${Day10.part2X(input)}")
+    println("part2: ${Day10.part2_2Recursive(input)}")
+//    println("part2: ${Day10.part2Hybrid(testInput)}")
+//    println("part2: ${Day10.part2Hybrid(input)}")
+//    println("part2: ${Day10.part2(input)}")
+//    println("part2: ${Day10.part2Recursive2(testInput)}")
+//    println("part2: ${Day10.part2Recursive2(input)}")
 //    println("part2: ${Day10.part2Recursive(testInput)}")
 //    println("part2: ${Day10.part2Hybrid(testInput)}")
 //    println("part2: ${Day10.part2Hybrid(input)}")
